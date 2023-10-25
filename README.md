@@ -249,7 +249,7 @@ Starte Keepalived<br>
 Überprüfe ob der Service läuft<br>
 `systemctl status keepalived`
 <br><br>
-__Wenn der Service läuft, wechsle zu VM 4__<br>
+__Wenn der Service läuft, wechsle zu VM 4 und mache dort das selbe wie bei VM 3__<br>
 __Diese wird der BACK-UP Prroxy__<br>
 <br>
 Gib dir root rechte
