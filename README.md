@@ -1,49 +1,35 @@
 # Hochverf-gbarkeits-Load-Balancer
 # 4VM's 2 Load Balancer ("HA Proxy", "nginx") 2 Webserver
-### SSH Keys erstellen um sich ohne Passwordeingabe anzumelden.
-___
-RSA Schlüssel erstellen<br>
-`ssh-keygen -t rsa`
-
-Den Privaten Schlüssel auf den Server pushen<br>
-`ssh-copy-id janne@janne-test-01.cloud.rto.de`
-
-Remote Shell öffnen<br>
-`ssh janne@janne-test-01.cloud.rto.de`
-
-Neues Konsolenfenster öffnen um wieder auf den Home rechner zu sein
-Dann ssh key zum zweiten server pushen<br>
-`ssh-copy-id janne@janne-test-02.cloud.rto.de`
-
-Anschließend kann man sich verbinden<br>
-`ssh janne@janne-test-02.cloud.rto.de`
 
 ### Webserver aufsetzen
 ___
 
+__Auf VM 1 und 2 werden Webserver aufgesetzt__
+
+Werde root user
+`sudo su`
+
 Installiere nginx<br>
-`sudo yum install nginx`
+`yum install nginx`
 
 nginx freischalten und starten<br>
-`sudo systemctl enable nginx`
+`systemctl enable nginx`
 
-`sudo systemctl start nginx`
+`systemctl start nginx`
 
-Ports mit der Firewall freigeben<br>
-`sudo firewall-cmd --permanent --add-service=http`
-
-`sudo firewall-cmd --permanent --add-service=https`
+Port mit der Firewall freigeben<br>
+`firewall-cmd --permanent --add-service=http`
 
 Firewall neu starten<br>
-`sudo firewall-cmd --reload`
+`firewall-cmd --reload`
 
 __Wenn man den Server jetzt aufruft sieht man die nginx default webseite__
 
 Installiere Nano zur editierung<br>
-`sudo yum install nano`
+`yum install nano`
 
 Gebe der Startdatei Schreibrechte<br>
-`sudo chmod 666 /usr/share/nginx/html/index.html`
+`chmod 666 /usr/share/nginx/html/index.html`
 
 Jetzt kann man mit folgenden Befehl die default html datei öffnen und editieren.<br>
 `nano /usr/share/nginx/html/index.html`
@@ -54,25 +40,30 @@ Anschließend den Server neu starten<br>
 __Nun ist wichtig das man den Cache lehrt,
 sonst werden die änderungen nicht angezeigt.__
 
-__Wiederhole das für Server 3__
+__Wiederhole das für Server 2 mit einer abgeänderten index.html__
 
 <br>
 
-### Reverse Proxy mit load balancer
-___
+### Reverse Proxy mit load balancer und Keepalived
+__Auf VM 3 und 4 werden Proxys eingerichtet__
 
-__Gehe wieder zu Server 1__
+Werde root user
+`sudo su`
 
 HA Proxy installieren<br>
-`sudo dnf -y install haproxy`
+`dnf -y install haproxy`
 
 Installiere Nano<br>
-`sudo yum install nano`
+`yum install nano`
 
 Die Datei editierbar machen<br>
-`sudo chmod 644 /etc/haproxy/haproxy.cfg`
+`chmod 644 /etc/haproxy/haproxy.cfg`
+
+Den Inhalt der Datei löschen
+`echo "" > /etc/haproxy/haproxy.cfg`
 
 Mit nano öffnen und folgenden Code einfügen
+`nano /etc/haproxy/haproxy.cfg`
 
 ```
 #  See the full configuration options online.
@@ -164,8 +155,8 @@ backend backend_servers
     # balance with roundrobin
     balance            roundrobin
     # define backend servers
-    server             node01 192.168.13.131:80 check
-    server             node02 192.168.13.251:80 check
+    server             node01 192.168.13.54:80 check
+    server             node02 192.168.13.131:80 check
 ```
 
     
@@ -173,11 +164,11 @@ Starte HA Proxy mit diesem Befehl<br>
 `systemctl enable --now haproxy`
 
 Öffne die Firewall<br>
-`sudo firewall-cmd --add-service=http`
+`firewall-cmd --add-service=http`
 
-`sudo firewall-cmd --runtime-to-permanent`
+`firewall-cmd --runtime-to-permanent`
 
-Log Konfigurationen anpassen<br>
+Log Konfigurationen anpassen falls nötig<br>
 `sudo chmod 677 /etc/rsyslog.conf`
 
 `nano /etc/rsyslog.conf`
@@ -200,17 +191,25 @@ Restart system<br>
 
 **Nun funktioniert der Reverse Proxy**
 
-**Setze einen zweiten Reverse Proxy mit dieser Anleitung auf**
+**VM 4 aufsetzen**
 
 **Wenn sich dieser Proxy so verhält, wie der andere kann
 weiter konfiguriert werden.**
 
 ### Hochverfügbarkeit mit Keepalived
+__Für VM 3 und 4__<br>
+__VM 3 wird MASTER VM 4 BackUp__
 
-Gehe zu VM 4<br>
+Beginne bei Server 3<br>
+
+Werde root user<br>
+`sudo su`
 
 Instaliere Keepalived<br>
-`sudo dnf install keepalived`
+`dnf install keepalived`
+
+Löschen den Inhalt der Keepalived.conf Datei<br>
+`echo "" > /etc/keepalived/keepalived.conf`
 
 Editiere die Config Datei<br>
 `sudo nano /etc/keepalived/keepalived.conf`
@@ -225,9 +224,9 @@ vrrp_instance Instance0 {
    interface enp1s0              # Zu überwachendes Interface
    state MASTER
    virtual_router_id 51          # ID der Route
-   unicast_src_ip 192.168.13.212
+   unicast_src_ip 192.168.13.251
    unicast_peer {
-       192.168.13.54
+       192.168.13.212
    }
    priority 101                  # 101 - Master, 100 - Backup
    advert_int 1
@@ -245,18 +244,25 @@ vrrp_instance Instance0 {
 ```
 
 Starte Keepalived<br>
-`sudo systemctl restart keepalived`
+`systemctl restart keepalived`
 <br>
 Überprüfe ob der Service läuft<br>
-`sudo systemctl status keepalived`
+`systemctl status keepalived`
 <br><br>
-__Wenn der Service läuft, wechsle zu VM 1__
+__Wenn der Service läuft, wechsle zu VM 4__<br>
+__Diese wird der BACK-UP Prroxy__<br>
 <br>
+Gib dir root rechte
+`sudo su`
+
 Instaliere Keepalived<br>
-`sudo dnf install keepalived`
+`dnf install keepalived`
+
+Löschen den Inhalt der Keepalived.conf Datei<br>
+`echo "" > /etc/keepalived/keepalived.conf`
 
 Öffne die Config Datei und füge den Code ein<br>
-`sudo nano /etc/keepalived/keepalived.conf`
+`nano /etc/keepalived/keepalived.conf`
 
 ```
 vrrp_script chk_haproxy {
@@ -268,9 +274,9 @@ vrrp_instance Instance0 {
    interface enp1s0              # Zu überwachendes Interface
    state MASTER
    virtual_router_id 51          # ID der Route
-   unicast_src_ip 192.168.13.54
+   unicast_src_ip 192.168.13.212
    unicast_peer {
-           192.168.13.212
+           192.168.13.54
    }
    priority 100                  # 101 - Master, 100 - Backup
    advert_int 1
@@ -288,10 +294,10 @@ vrrp_instance Instance0 {
 ```
 
 Starte Keepalived<br>
-`sudo systemctl restart keepalived`
+`systemctl restart keepalived`
 <br>
 Überprüfe ob der Service läuft<br>
-`sudo systemctl status keepalived`
+`systemctl status keepalived`
 <br><br>
 __Nun sollte bei ausfall des einen Loadbalancers der andere einspringen__
 
