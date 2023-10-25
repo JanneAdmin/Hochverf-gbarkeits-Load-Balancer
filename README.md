@@ -4,7 +4,7 @@
 ### Webserver aufsetzen
 ___
 
-__Auf VM 1 und 2 werden Webserver aufgesetzt__
+__Auf VM 3 und 4 werden Webserver aufgesetzt__
 
 Werde root user
 `sudo su`
@@ -40,12 +40,13 @@ Anschließend den Server neu starten<br>
 __Nun ist wichtig das man den Cache lehrt,
 sonst werden die änderungen nicht angezeigt.__
 
-__Wiederhole das für Server 2 mit einer abgeänderten index.html__
+__Wiederhole das für Server 4 mit einer abgeänderten index.html__
 
 <br>
 
 ### Reverse Proxy mit load balancer und Keepalived
-__Auf VM 3 und 4 werden Proxys eingerichtet__
+__Auf VM 1 und 2 werden Proxys eingerichtet__<br>
+__Starte mit VM 1__
 
 Werde root user
 `sudo su`
@@ -155,8 +156,8 @@ backend backend_servers
     # balance with roundrobin
     balance            roundrobin
     # define backend servers
-    server             node01 192.168.13.54:80 check
-    server             node02 192.168.13.131:80 check
+    server             node01 192.168.13.251:80 check
+    server             node02 192.168.13.212:80 check
 ```
 
     
@@ -189,18 +190,17 @@ line 47 : change like follows<br>
 Restart system<br>
 `systemctl restart rsyslog`
 
-**Nun funktioniert der Reverse Proxy**
-__Wenn der Service läuft, wechsle zu VM 4 und mache dort das selbe wie bei VM 3__<br>
-**VM 4 aufsetzen**
+**Nun funktioniert der Reverse Proxy**<br>
+**Nun wiederhole diesen Abschnitt für VM 2**
 
 **Wenn sich dieser Proxy so verhält, wie der andere kann
 weiter konfiguriert werden.**
 
 ### Hochverfügbarkeit mit Keepalived
-__Für VM 3 und 4__<br>
-__VM 3 wird MASTER VM 4 BackUp__
+__Für VM 1 und 2__<br>
+__VM 1 wird MASTER VM 2 BackUp__
 
-Beginne bei Server 3<br>
+__Beginne bei Server 1__<br>
 
 Werde root user<br>
 `sudo su`
@@ -224,9 +224,9 @@ vrrp_instance Instance0 {
    interface enp1s0              # Zu überwachendes Interface
    state MASTER
    virtual_router_id 51          # ID der Route
-   unicast_src_ip 192.168.13.251
+   unicast_src_ip 192.168.13.54
    unicast_peer {
-       192.168.13.212
+       192.168.13.131
    }
    priority 101                  # 101 - Master, 100 - Backup
    advert_int 1
@@ -249,7 +249,7 @@ Starte Keepalived<br>
 Überprüfe ob der Service läuft<br>
 `systemctl status keepalived`
 <br><br>
-__Diese wird der BACK-UP Prroxy__<br>
+__Nun wird der BACK-UP Prroxy erstellt__<br>
 <br>
 Gib dir root rechte
 `sudo su`
@@ -273,7 +273,7 @@ vrrp_instance Instance0 {
    interface enp1s0              # Zu überwachendes Interface
    state MASTER
    virtual_router_id 51          # ID der Route
-   unicast_src_ip 192.168.13.212
+   unicast_src_ip 192.168.13.131
    unicast_peer {
            192.168.13.54
    }
